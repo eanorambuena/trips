@@ -1,0 +1,12 @@
+{
+  "name": "agentic-headquarters",
+  "version": "1.0.0",
+  "description": "Personal AI Agent Headquarter with OpenCode integration",
+  "private": true,
+  "scripts": {
+    "postinstall": "bash scripts/postinstall.sh"
+  },
+  "keywords": ["opencode", "ai", "agents", "headquarter"],
+  "author": "",
+  "license": "MIT"
+}

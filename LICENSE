@@ -1,0 +1,90 @@
+Business Source License 1.1
+
+License text copyright (c) 2026 Emmanuel Norambuena, All Rights Reserved.
+"Business Source License" is a trademark of MariaDB Corporation Ab.
+
+---------------------------------------------------------------------
+
+Parameters
+
+Licensor:             Emmanuel Norambuena
+Licensed Work:        Agentic-Headquarters
+                      The Licensed Work is (c) 2026 Emmanuel Norambuena
+
+Change Date:          2031-01-01
+
+Change License:       Apache License, Version 2.0
+
+---------------------------------------------------------------------
+
+Additional Use Grant:
+
+You may use the Licensed Work in production in accordance with this License
+for any purpose, provided that:
+
+a) You are an individual or a business with annual revenue ≤ $1,000,000 USD;
+b) You do not use the Licensed Work to provide services to third parties;
+c) You do not embed or distribute the Licensed Work in products offered
+   to customers as a service (SaaS);
+d) You do not use the Licensed Work to create a competing product.
+
+If you meet conditions (a)-(d), you have full production use rights.
+
+If you do not meet condition (a) but want to use the Licensed Work,
+contact the Licensor for a commercial license.
+
+---------------------------------------------------------------------
+
+Terms
+
+The Business Source License (this document) is not an Open Source license.
+However, the Licensed Work will eventually be made available under an
+Open Source License, as stated in this License.
+
+1. Definitions
+
+   "Licensed Work" means the software, documentation, and other materials
+   provided by Licensor under this License.
+
+   "Licensor" means the copyright holder identified above.
+
+   "You" means the individual or entity exercising rights under this License.
+
+2. Grant of Rights
+
+   The Licensor hereby grants You the right to copy, modify, create
+   derivative works, redistribute, and make non-production use of the
+   Licensed Work.
+
+3. Production Use
+
+   Production use is permitted only under the Additional Use Grant above.
+
+4. Notices
+
+   You must conspicuously display this License on each original or modified
+   copy of the Licensed Work. You must retain all copyright notices in
+   source files.
+
+5. No Warranty
+
+   TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED
+   ON AN "AS IS" BASIS. THE LICENSOR DISCLAIMS ALL WARRANTIES, EXPRESS OR
+   IMPLIED, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND TITLE.
+
+6. Termination
+
+   If You violate this License, Your rights under this License automatically
+   terminate for all copies of the Licensed Work.
+
+7. Change Date and License
+
+   On the Change Date, the Licensed Work automatically transitions to the
+   Change License (Apache 2.0). After that date, Your rights are governed
+   by the Change License.
+
+---------------------------------------------------------------------
+
+License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
+"Business Source License" is a trademark of MariaDB Corporation Ab.

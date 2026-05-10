@@ -7,6 +7,7 @@ import {
   MarkerTooltip,
   MapControls,
   MapRoute,
+  MapArc,
 } from './components/ui/map';
 import { Card } from './components/ui/card';
 
@@ -18,21 +19,60 @@ async function getCoordinates(place) {
   );
   const data = await response.json();
   if (data.length > 0) {
-    return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+    return {
+      lng: parseFloat(data[0].lon),
+      lat: parseFloat(data[0].lat),
+      name: data[0].display_name,
+    };
   }
   throw new Error(`No se encontró: ${place}`);
 }
 
-async function getRoute(start, end) {
+async function getDrivingRoute(start, end) {
   const response = await fetch(
-    `https://router.project-osrm.org/route/v1/driving/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson`
+    `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
   );
   const data = await response.json();
   if (data.routes && data.routes.length > 0) {
-    return data.routes[0];
+    return {
+      geometry: data.routes[0].geometry,
+      distance: data.routes[0].distance,
+      duration: data.routes[0].duration,
+      coordinates: data.routes[0].geometry.coordinates,
+    };
   }
   throw new Error('No se encontró ruta');
 }
+
+async function getFlightRoute(start, end) {
+  return {
+    geometry: null,
+    distance: haversineDistance(start, end),
+    duration: Math.ceil(haversineDistance(start, end) / 800 * 60),
+    coordinates: [[start.lng, start.lat], [end.lng, end.lat]],
+    type: 'flight',
+  };
+}
+
+function haversineDistance(point1, point2) {
+  const R = 6371;
+  const dLat = toRad(point2.lat - point1.lat);
+  const dLon = toRad(point2.lng - point1.lng);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(point1.lat)) * Math.cos(toRad(point2.lat)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg) {
+  return deg * (Math.PI / 180);
+}
+
+const TRANSPORT_MODES = [
+  { id: 'driving', label: '🚗 Carretera', icon: '🚗' },
+  { id: 'flight', label: '✈️ Avión', icon: '✈️' },
+];
 
 export default function App() {
   const [startPoint, setStartPoint] = useState('');
@@ -42,6 +82,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [markers, setMarkers] = useState([]);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [transportMode, setTransportMode] = useState('driving');
 
   const calculateRoute = async () => {
     if (!startPoint || !endPoint) {
@@ -56,20 +97,23 @@ export default function App() {
     try {
       const start = await getCoordinates(startPoint);
       const end = await getCoordinates(endPoint);
-      const route = await getRoute(start, end);
+
+      const route = transportMode === 'driving'
+        ? await getDrivingRoute(start, end)
+        : await getFlightRoute(start, end);
 
       setRouteInfo({
         distance: (route.distance / 1000).toFixed(1),
-        duration: Math.round(route.duration / 60),
+        duration: Math.round(route.duration),
+        mode: transportMode,
       });
 
       setMarkers([
-        { id: 'start', lng: start[0], lat: start[1], label: 'Origen' },
-        { id: 'end', lng: end[0], lat: end[1], label: 'Destino' },
+        { id: 'start', lng: start.lng, lat: start.lat, label: start.name.split(',')[0] },
+        { id: 'end', lng: end.lng, lat: end.lat, label: end.name.split(',')[0] },
       ]);
 
-      const coords = route.geometry.coordinates;
-      setRouteCoords(coords);
+      setRouteCoords(route.coordinates);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -116,6 +160,22 @@ export default function App() {
           </button>
         </div>
 
+        <div className="flex gap-2 mt-4">
+          {TRANSPORT_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setTransportMode(mode.id)}
+              className={`px-4 py-2 rounded border ${
+                transportMode === mode.id
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
         {error && <p className="text-red-500 mt-2 text-sm">{error}</p>}
 
         {routeInfo && (
@@ -127,6 +187,10 @@ export default function App() {
             <div>
               <span className="font-semibold text-gray-600">Duración:</span>{' '}
               {routeInfo.duration} min
+            </div>
+            <div>
+              <span className="font-semibold text-gray-600">Modo:</span>{' '}
+              {routeInfo.mode === 'driving' ? 'Carretera' : 'Avión'}
             </div>
           </div>
         )}
@@ -162,12 +226,30 @@ export default function App() {
             ))}
 
             {routeCoords.length > 0 && (
-              <MapRoute
-                coordinates={routeCoords}
-                color="#3b9eff"
-                width={4}
-                opacity={0.8}
-              />
+              transportMode === 'flight' ? (
+                <MapArc
+                  data={[
+                    {
+                      id: 'flight-route',
+                      from: [markers[0].lng, markers[0].lat],
+                      to: [markers[1].lng, markers[1].lat],
+                    },
+                  ]}
+                  curvature={0.3}
+                  paint={{
+                    'line-color': '#8b5cf6',
+                    'line-width': 3,
+                    'line-opacity': 0.8,
+                  }}
+                />
+              ) : (
+                <MapRoute
+                  coordinates={routeCoords}
+                  color="#3b9eff"
+                  width={4}
+                  opacity={0.8}
+                />
+              )
             )}
           </Map>
         </Card>

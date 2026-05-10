@@ -1,4 +1,4 @@
-import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef } from 'react';
 import {
   Map as MapComponent,
   MapControls,
@@ -10,11 +10,9 @@ import {
 } from './components/ui/map';
 import { Card } from './components/ui/card';
 import { PlaceInput } from './components/PlaceInput';
+import { PhotoGallery } from './components/PhotoGallery';
 import { TRANSPORT_MODES, getTransportMode } from './lib/transport';
 import { saveTrip, getTrips, deleteTrip, generateTripId, generateSegmentId } from './lib/storage';
-import { useEffect } from 'react';
-
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
 async function getRouteOSRM(start, end) {
   const response = await fetch(
@@ -116,12 +114,13 @@ export default function App() {
   const [error, setError] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
   const [tripName, setTripName] = useState('');
-  const mapRef = useRef(null);
+  const [selectedSegmentForPhotos, setSelectedSegmentForPhotos] = useState(null);
+  const [showPhotoPanel, setShowPhotoPanel] = useState(false);
   const mapInstanceRef = useRef(null);
 
-  useEffect(() => {
+  useState(() => {
     setTrips(getTrips());
-  }, []);
+  });
 
   const handleOriginSelect = (place) => {
     setOrigin({ value: place.name, place });
@@ -159,6 +158,7 @@ export default function App() {
         distance: segmentData.distance,
         duration: segmentData.duration,
         coordinates: segmentData.coordinates,
+        photos: [],
       };
 
       setSegments([newSegment]);
@@ -187,7 +187,6 @@ export default function App() {
       segments: segments.map(s => ({
         ...s,
         coordinates: undefined,
-        photos: s.photos || [],
       })),
       totalDistance: segments.reduce((sum, s) => sum + s.distance, 0),
       totalDuration: segments.reduce((sum, s) => sum + s.duration, 0),
@@ -210,6 +209,7 @@ export default function App() {
       coordinates: s.mode === 'flight' || s.mode === 'walking' || s.mode === 'bicycle'
         ? [[s.from.lng, s.from.lat], [s.to.lng, s.to.lat]]
         : s.coordinates || [[s.from.lng, s.from.lat], [s.to.lng, s.to.lat]],
+      photos: s.photos || [],
     }));
     setSegments(loadedSegments);
 
@@ -249,6 +249,34 @@ export default function App() {
     setSegments(newSegments);
   };
 
+  const addPhotoToSegment = (segmentId, photo, update = false) => {
+    setSegments(prev => prev.map(seg => {
+      if (seg.id !== segmentId) return seg;
+      
+      if (update) {
+        return {
+          ...seg,
+          photos: seg.photos.map(p => p.id === photo.id ? photo : p),
+        };
+      }
+      
+      return {
+        ...seg,
+        photos: [...(seg.photos || []), photo],
+      };
+    }));
+  };
+
+  const removePhotoFromSegment = (segmentId, photoId) => {
+    setSegments(prev => prev.map(seg => {
+      if (seg.id !== segmentId) return seg;
+      return {
+        ...seg,
+        photos: seg.photos.filter(p => p.id !== photoId),
+      };
+    }));
+  };
+
   const newTrip = () => {
     setSelectedTrip(null);
     setTripName('');
@@ -259,27 +287,41 @@ export default function App() {
 
   const renderSegment = (seg, index) => {
     const mode = getTransportMode(seg.mode);
+    const photoCount = seg.photos?.length || 0;
 
     return (
-      <div key={seg.id || index} className="flex items-center gap-2 p-2 bg-gray-50 rounded mb-2">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold`} style={{ backgroundColor: mode.color }}>
-          {mode.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{seg.from.name} → {seg.to.name}</div>
-          <div className="text-xs text-gray-500">
-            {(seg.distance / 1000).toFixed(1)} km · {Math.round(seg.duration / 60)} min
+      <div key={seg.id || index} className="border rounded-lg p-3 mb-2 bg-white">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold`} style={{ backgroundColor: mode.color }}>
+            {mode.icon}
           </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">{seg.from.name} → {seg.to.name}</div>
+            <div className="text-xs text-gray-500">
+              {(seg.distance / 1000).toFixed(1)} km · {Math.round(seg.duration / 60)} min
+              {photoCount > 0 && <span className="ml-2 text-blue-500">📷 {photoCount}</span>}
+            </div>
+          </div>
+          <select
+            value={seg.mode}
+            onChange={(e) => updateSegmentMode(index, e.target.value)}
+            className="text-xs border rounded px-2 py-1"
+          >
+            {TRANSPORT_MODES.map(m => (
+              <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setSelectedSegmentForPhotos(seg);
+              setShowPhotoPanel(true);
+            }}
+            className="text-blue-500 hover:text-blue-700 text-lg"
+            title="Ver/agregar fotos"
+          >
+            📷
+          </button>
         </div>
-        <select
-          value={seg.mode}
-          onChange={(e) => updateSegmentMode(index, e.target.value)}
-          className="text-xs border rounded px-1 py-1"
-        >
-          {TRANSPORT_MODES.map(m => (
-            <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
-          ))}
-        </select>
       </div>
     );
   };
@@ -362,6 +404,8 @@ export default function App() {
               <div className="text-sm text-gray-600 mb-2">
                 Total: {(segments.reduce((s, seg) => s + seg.distance, 0) / 1000).toFixed(1)} km ·{' '}
                 {Math.round(segments.reduce((s, seg) => s + seg.duration, 0) / 60)} min
+                {' · '}
+                {segments.reduce((s, seg) => s + (seg.photos?.length || 0), 0)} fotos
               </div>
               {segments.map((seg, i) => renderSegment(seg, i))}
             </div>
@@ -424,6 +468,25 @@ export default function App() {
             </MapComponent>
           </Card>
         </div>
+
+        {showPhotoPanel && selectedSegmentForPhotos && (
+          <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-end" onClick={() => setShowPhotoPanel(false)}>
+            <div className="w-96 h-full bg-white shadow-xl overflow-auto" onClick={e => e.stopPropagation()}>
+              <div className="p-4 border-b flex items-center justify-between bg-gray-50">
+                <h3 className="font-bold">Fotos: {selectedSegmentForPhotos.from.name} → {selectedSegmentForPhotos.to.name}</h3>
+                <button onClick={() => setShowPhotoPanel(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              </div>
+              <div className="p-4">
+                <PhotoGallery
+                  photos={selectedSegmentForPhotos.photos || []}
+                  onAdd={(photo, update) => addPhotoToSegment(selectedSegmentForPhotos.id, photo, update)}
+                  onRemove={(photoId) => removePhotoFromSegment(selectedSegmentForPhotos.id, photoId)}
+                  editable={true}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-2 text-xs text-gray-500 flex gap-4 justify-center bg-gray-100">
           {TRANSPORT_MODES.slice(0, 6).map(m => (

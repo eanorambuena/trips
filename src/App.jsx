@@ -11,12 +11,11 @@ import {
 import { Card } from './components/ui/card';
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-const NOMINATIM_AUTOCOMPLETE = 'https://nominatim.openstreetmap.org/search';
 
 async function searchPlaces(query) {
   if (!query || query.length < 2) return [];
   const response = await fetch(
-    `${NOMINATIM_AUTOCOMPLETE}?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`
+    `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`
   );
   const data = await response.json();
   return data.map((item) => ({
@@ -74,11 +73,16 @@ async function getFlightRoute(start, end) {
   };
 }
 
-function PlaceInput({ label, value, onChange, onSelect, placeholder, index }) {
+const TRANSPORT_MODES = [
+  { id: 'driving', label: '🚗 Carretera', color: '#3b9eff' },
+  { id: 'flight', label: '✈️ Avión', color: '#8b5cf6' },
+  { id: 'train', label: '🚄 Tren', color: '#22c55e' },
+];
+
+function PlaceInput({ label, value, onChange, onSelect, placeholder, icon }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
   const handleChange = (e) => {
@@ -116,27 +120,16 @@ function PlaceInput({ label, value, onChange, onSelect, placeholder, index }) {
     setTimeout(() => setShowSuggestions(false), 200);
   };
 
-  const getIcon = () => {
-    if (index === 0) return 'A';
-    if (index === -1) return 'B';
-    return null;
-  };
-
   return (
     <div className="relative flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        {getIcon() && (
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-            getIcon() === 'A' ? 'bg-green-500' : 'bg-red-500'
-          }`}>
-            {getIcon()}
-          </div>
-        )}
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${icon === 'A' ? 'bg-green-500' : 'bg-red-500'}`}>
+          {icon}
+        </div>
         <label className="text-sm font-semibold text-gray-600">{label}</label>
       </div>
       <div className="relative">
         <input
-          ref={inputRef}
           type="text"
           value={value}
           onChange={handleChange}
@@ -169,185 +162,37 @@ function PlaceInput({ label, value, onChange, onSelect, placeholder, index }) {
   );
 }
 
-function ViaPointInput({ index, point, onChange, onRemove }) {
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const debounceRef = useRef(null);
-
-  const handleNameChange = (e) => {
-    const query = e.target.value;
-    onChange(index, 'name', e.target.value);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    setLoading(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const results = await searchPlaces(query);
-        setSuggestions(results);
-        setShowSuggestions(true);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-  };
-
-  const handleSelect = (place) => {
-    onChange(index, 'name', place.name);
-    onChange(index, 'place', place);
-    setSuggestions([]);
-    setShowSuggestions(false);
-  };
-
-  const handleBlur = () => {
-    setTimeout(() => setShowSuggestions(false), 200);
-  };
-
-  const getModeIcon = () => {
-    const icons = { flight: '✈️', train: '🚄', driving: '🚗' };
-    return icons[point.mode] || '🚗';
-  };
-
-  return (
-    <div className="flex items-end gap-2">
-      <div className="relative flex flex-col gap-1">
-        <label className="text-sm font-semibold text-gray-600 flex items-center gap-1">
-          <span className="w-5 h-5 rounded-full bg-yellow-500 text-white text-xs flex items-center justify-center">
-            {String.fromCharCode(66 + index)}
-          </span>
-          Escala {index + 1}
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={point.name}
-            onChange={handleNameChange}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            onBlur={handleBlur}
-            placeholder="Ciudad"
-            className="border rounded px-3 py-2 w-40 pr-8"
-          />
-          {loading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-          {showSuggestions && suggestions.length > 0 && (
-            <ul className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-auto">
-              {suggestions.map((place, i) => (
-                <li
-                  key={i}
-                  onClick={() => handleSelect(place)}
-                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
-                >
-                  <div className="font-medium text-sm">{place.name}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-      <select
-        value={point.mode}
-        onChange={(e) => onChange(index, 'mode', e.target.value)}
-        className="border rounded px-2 py-2 text-sm"
-        title="Medio de transporte"
-      >
-        <option value="flight">✈️ Avión</option>
-        <option value="train">🚄 Tren</option>
-        <option value="driving">🚗 Carretera</option>
-      </select>
-      <button
-        onClick={() => onRemove(index)}
-        className="text-red-500 hover:text-red-700 pb-2 px-2"
-        title="Eliminar escala"
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
-
-const TRANSPORT_MODES = {
-  driving: { label: 'Carretera', color: '#3b9eff', icon: '🚗' },
-  flight: { label: 'Avión', color: '#8b5cf6', icon: '✈️' },
-  train: { label: 'Tren', color: '#22c55e', icon: '🚄' },
-};
-
 export default function App() {
   const [startPoint, setStartPoint] = useState('');
   const [startPlace, setStartPlace] = useState(null);
   const [endPoint, setEndPoint] = useState('');
   const [endPlace, setEndPlace] = useState(null);
-  const [viaPoints, setViaPoints] = useState([{ name: '', mode: 'flight', place: null }]);
+  const [transportMode, setTransportMode] = useState('driving');
   const [routeInfo, setRouteInfo] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [allMarkers, setAllMarkers] = useState([]);
+  const [markers, setMarkers] = useState([]);
   const [segments, setSegments] = useState([]);
 
-  const addViaPoint = () => {
-    setViaPoints([...viaPoints, { name: '', mode: 'flight', place: null }]);
-  };
-
-  const removeViaPoint = (index) => {
-    setViaPoints(viaPoints.filter((_, i) => i !== index));
-  };
-
-  const updateViaPoint = (index, field, value) => {
-    const updated = [...viaPoints];
-    updated[index] = { ...updated[index], [field]: value };
-    setViaPoints(updated);
-  };
-
   const calculateRoute = async () => {
-    const locations = [];
+    let startCoords = startPlace;
+    let endCoords = endPlace;
 
-    if (startPlace) {
-      locations.push({ ...startPlace, mode: 'flight' });
-    } else if (startPoint.trim()) {
+    if (!startCoords && startPoint.trim()) {
       try {
         const results = await searchPlaces(startPoint);
-        if (results.length > 0) {
-          locations.push({ ...results[0], mode: 'flight' });
-        }
+        if (results.length > 0) startCoords = results[0];
       } catch {}
     }
 
-    viaPoints.forEach((vp) => {
-      if (vp.place) {
-        locations.push({ ...vp.place, mode: vp.mode });
-      } else if (vp.name.trim()) {
-        locations.push({ name: vp.name, mode: vp.mode, lng: null, lat: null });
-      }
-    });
-
-    if (endPlace) {
-      locations.push({ ...endPlace, mode: 'driving' });
-    } else if (endPoint.trim()) {
+    if (!endCoords && endPoint.trim()) {
       try {
         const results = await searchPlaces(endPoint);
-        if (results.length > 0) {
-          locations.push({ ...results[0], mode: 'driving' });
-        }
+        if (results.length > 0) endCoords = results[0];
       } catch {}
     }
 
-    const missingCoords = locations.filter((l) => l.lng === null);
-    if (missingCoords.length > 0) {
-      setError(`No se encontró: ${missingCoords.map((l) => l.name).join(', ')}`);
-      return;
-    }
-
-    if (locations.length < 2) {
+    if (!startCoords || !endCoords) {
       setError('Ingresa origen y destino');
       return;
     }
@@ -357,52 +202,34 @@ export default function App() {
     setLoading(true);
 
     try {
-      const allMarkersData = locations.map((loc, i) => ({
-        id: `point-${i}`,
-        lng: loc.lng,
-        lat: loc.lat,
-        label: loc.name,
-        isTerminal: i === 0 || i === locations.length - 1,
-      }));
-      setAllMarkers(allMarkersData);
+      setMarkers([
+        { id: 'start', lng: startCoords.lng, lat: startCoords.lat, label: startCoords.name },
+        { id: 'end', lng: endCoords.lng, lat: endCoords.lat, label: endCoords.name },
+      ]);
 
-      const newSegments = [];
-      let totalDistance = 0;
-      let totalDuration = 0;
-
-      for (let i = 0; i < locations.length - 1; i++) {
-        const from = locations[i];
-        const to = locations[i + 1];
-        const mode = from.mode;
-
-        let segment;
-        if (mode === 'flight') {
-          segment = await getFlightRoute(from, to);
-        } else if (mode === 'train') {
-          segment = await getTrainRoute(from, to);
-        } else {
-          segment = await getDrivingRoute(from, to);
-        }
-
-        totalDistance += segment.distance;
-        totalDuration += segment.duration;
-
-        newSegments.push({
-          id: `seg-${i}`,
-          from: [from.lng, from.lat],
-          to: [to.lng, to.lat],
-          coordinates: segment.coordinates,
-          mode,
-          distance: segment.distance,
-          duration: segment.duration,
-        });
+      let segment;
+      if (transportMode === 'flight') {
+        segment = await getFlightRoute(startCoords, endCoords);
+      } else if (transportMode === 'train') {
+        segment = await getTrainRoute(startCoords, endCoords);
+      } else {
+        segment = await getDrivingRoute(startCoords, endCoords);
       }
 
-      setSegments(newSegments);
+      setSegments([{
+        id: 'seg-0',
+        from: [startCoords.lng, startCoords.lat],
+        to: [endCoords.lng, endCoords.lat],
+        coordinates: segment.coordinates,
+        mode: transportMode,
+        distance: segment.distance,
+        duration: segment.duration,
+      }]);
+
       setRouteInfo({
-        distance: (totalDistance / 1000).toFixed(1),
-        duration: Math.round(totalDuration / 60),
-        segments: newSegments.length,
+        distance: (segment.distance / 1000).toFixed(1),
+        duration: Math.round(segment.duration / 60),
+        mode: transportMode,
       });
     } catch (err) {
       setError(err.message);
@@ -431,18 +258,8 @@ export default function App() {
               setStartPoint(place.name);
             }}
             placeholder="Ciudad de origen"
-            index={0}
+            icon="A"
           />
-
-          {viaPoints.map((via, index) => (
-            <ViaPointInput
-              key={index}
-              index={index}
-              point={via}
-              onChange={updateViaPoint}
-              onRemove={removeViaPoint}
-            />
-          ))}
 
           <PlaceInput
             label="Destino"
@@ -456,63 +273,64 @@ export default function App() {
               setEndPoint(place.name);
             }}
             placeholder="Ciudad de destino"
-            index={-1}
+            icon="B"
           />
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={addViaPoint}
-            className="text-blue-500 hover:text-blue-700 border border-blue-500 px-3 py-1 rounded text-sm flex items-center gap-1"
-          >
-            <span>+</span> Agregar escala
-          </button>
-          <button
-            onClick={calculateRoute}
-            disabled={loading}
-            className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Buscando...
-              </>
-            ) : (
-              <>🔍 Buscar Ruta</>
-            )}
-          </button>
+          {TRANSPORT_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setTransportMode(mode.id)}
+              className={`px-4 py-2 rounded border transition-all ${
+                transportMode === mode.id
+                  ? 'bg-blue-500 text-white border-blue-500 shadow-md'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
         </div>
 
+        <button
+          onClick={calculateRoute}
+          disabled={loading}
+          className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 text-lg"
+        >
+          {loading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Buscando...
+            </>
+          ) : (
+            <>🔍 Buscar Ruta</>
+          )}
+        </button>
+
         {error && (
-          <div className="flex items-center gap-2 text-red-500 text-sm bg-red-50 p-2 rounded">
+          <div className="flex items-center gap-2 text-red-500 text-sm bg-red-50 p-3 rounded">
             ⚠️ {error}
           </div>
         )}
 
         {routeInfo && (
-          <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg space-y-3">
+          <div className={`p-4 rounded-lg space-y-2 ${
+            routeInfo.mode === 'flight' ? 'bg-purple-50' :
+            routeInfo.mode === 'train' ? 'bg-green-50' : 'bg-blue-50'
+          }`}>
             <div className="flex gap-8 text-lg">
               <div>
                 <span className="font-semibold text-gray-600">Distancia:</span>{' '}
-                <span className="text-blue-600 font-bold">{routeInfo.distance} km</span>
+                <span className="font-bold">{routeInfo.distance} km</span>
               </div>
               <div>
                 <span className="font-semibold text-gray-600">Duración:</span>{' '}
-                <span className="text-purple-600 font-bold">{routeInfo.duration} min</span>
+                <span className="font-bold">{routeInfo.duration} min</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              {segments.map((seg, i) => (
-                <div key={seg.id} className="flex items-center gap-2 text-sm">
-                  <span className={`px-2 py-1 rounded-full text-white ${
-                    seg.mode === 'flight' ? 'bg-purple-500' :
-                    seg.mode === 'train' ? 'bg-green-500' : 'bg-blue-500'
-                  }`}>
-                    {TRANSPORT_MODES[seg.mode].icon} {(seg.distance / 1000).toFixed(0)}km
-                  </span>
-                  {i < segments.length - 1 && <span className="text-gray-400">→</span>}
-                </div>
-              ))}
+            <div className="text-sm text-gray-600">
+              {TRANSPORT_MODES.find((m) => m.id === routeInfo.mode)?.label}
             </div>
           </div>
         )}
@@ -523,7 +341,7 @@ export default function App() {
           <Map center={[-74.006, 40.7128]} zoom={4}>
             <MapControls />
 
-            {allMarkers.map((marker, i) => (
+            {markers.map((marker, i) => (
               <MapMarker
                 key={marker.id}
                 longitude={marker.lng}
@@ -532,10 +350,10 @@ export default function App() {
                 <MarkerContent>
                   <div
                     className={`w-10 h-10 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white font-bold text-lg ${
-                      i === 0 ? 'bg-green-500' : i === allMarkers.length - 1 ? 'bg-red-500' : 'bg-yellow-500'
+                      i === 0 ? 'bg-green-500' : 'bg-red-500'
                     }`}
                   >
-                    {String.fromCharCode(65 + i)}
+                    {i === 0 ? 'A' : 'B'}
                   </div>
                 </MarkerContent>
                 <MarkerPopup>
@@ -588,9 +406,9 @@ export default function App() {
       </div>
 
       <div className="p-4 text-sm text-gray-600 flex gap-6 justify-center bg-gray-100">
-        <span>✈️ <strong>Avión</strong></span>
-        <span>🚄 <strong>Tren</strong></span>
-        <span>🚗 <strong>Carretera</strong></span>
+        <span>✈️ <strong>Avión</strong> - Línea morada punteada</span>
+        <span>🚄 <strong>Tren</strong> - Línea verde</span>
+        <span>🚗 <strong>Carretera</strong> - Línea azul</span>
       </div>
     </div>
   );
